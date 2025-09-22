@@ -25,10 +25,15 @@ pid_t background_pid = 0;
  * Make sure that you allocate enough space for the array.
  */
 
-void tokenize(char* str, const char* delim, char ** argv) {
+void tokenize(char* str, const char* delim, char ** argv, int* pipe_flag) {
 	char* token;
 	token = strtok(str, delim);
 	for(size_t i = 0; token != NULL; ++i){
+		if (strcmp(token, "|") == 0){
+			*pipe_flag = 1;
+			break;
+		}
+
     	argv[i] = token;
   		token = strtok(NULL, delim);
   	}
@@ -55,25 +60,25 @@ void run_external_program(char* command, char** args, int background){
 	int input_redirect = 0, output_redirect = 0;
 	char* input_file = NULL, *output_file = NULL;
 
-	// Check for input redirection
-
-	for (int i = 0; args[i] != NULL; ++i)
-		if (strcmp(args[i], "<") == 0){
-			input_redirect = 1;
-			input_file = args[i + 1];
-			args[i] = NULL; 
-			/* Since '<' is just an identifier, but not a part of the file. 
-			We need to set it to NULL after the system specifies it and finishes redireciton*/
-			
-			break;
-		}
-
 	// Check for output redirection
 
 	for (int i = 0; args[i] != NULL; ++i)
-		if (strcmp(args[i], ">") == 0){
+		if (strcmp(args[i], ">") == 0 && args[i + 1] != NULL){
 			output_redirect = 1;
 			output_file = args[i + 1];
+			args[i] = NULL; 
+			/* Since '>' is just an identifier, but not a part of the file. 
+			We need to set it to NULL after the system specifies it and finishes redirection*/
+
+			break;
+		}
+
+	// Check for input redirection
+
+	for (int i = 0; args[i] != NULL; ++i)
+		if (strcmp(args[i], "<") == 0 && args[i + 1] != NULL){
+			input_redirect = 1;
+			input_file = args[i + 1];
 			args[i] = NULL; // Same logic as above one
 
 			break;
@@ -83,18 +88,6 @@ void run_external_program(char* command, char** args, int background){
 
 	if (pid == 0){
 		// Handle redirection in child process
-
-		if (input_redirect){
-			int input_fd = open(input_file, O_RDONLY);
-
-			if (input_fd == -1){
-				perror("Error opening input file.");
-				exit(1);
-			}
-
-			dup2(input_fd, STDIN_FILENO);
-			close(input_fd);
-		}
 
 		if (output_redirect){
 			int output_fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -106,6 +99,18 @@ void run_external_program(char* command, char** args, int background){
 
 			dup2(output_fd, STDOUT_FILENO);
 			close(output_fd);
+		}
+
+		if (input_redirect){
+			int input_fd = open(input_file, O_RDONLY);
+
+			if (input_fd == -1){
+				perror("Error opening input file.");
+				exit(1);
+			}
+
+			dup2(input_fd, STDIN_FILENO);
+			close(input_fd);
 		}
 
 
@@ -132,14 +137,59 @@ void run_external_program(char* command, char** args, int background){
 	}
 }
 
+void execute_pipe(char* args[], char* second_args[]){
+	int fd[2];
+
+	if (pipe(fd) < 0){
+		perror("pipe failed");
+		exit(1);
+	}
+
+	pid_t pid = fork();
+
+	if (pid < 0){
+		perror("fork error");
+		exit(1);
+	}
+
+	if (pid == 0){
+		// Child process
+		// First command (writes to the pipe)
+
+		dup2(fd[1], STDOUT_FILENO);
+		close(fd[0]); // CLose read end of the pipe in child
+		close(fd[1]); // Close write end after duplicating
+		
+		execvp(args[0], args);
+		perror("execvp failed");
+		exit(1);
+	}
+
+	else if (pid > 0){
+		// Parent process
+		// Read from the child
+
+		dup2(fd[0], STDIN_FILENO);
+		close(fd[1]); // Close write end of the pipe in parent
+		close(fd[0]); // Close read end after duplicating
+
+		execvp(second_args[0], second_args);
+		perror("execvp failed");
+		exit(1);
+
+		waitpid(pid, NULL, 0);
+	}
+}
+
 int main(int argc, char **argv) {
 	// print the string prompt without a newline, before beginning to read
 	// tokenize the input, run the command(s), and print the result
 	// do this in a loop
 
 	char line[LINE_LENGTH];
-	char* args[MAX_ARGS] = {NULL};
+	char* args[MAX_ARGS + 1] = {NULL};
 	char* command;
+	int pipe_flag = 0; // Flag to indicate pipe
 
 	printf("Welcome to Dragon Shell!\n");
 
@@ -167,7 +217,15 @@ int main(int argc, char **argv) {
 		for (int i = 0; i < MAX_ARGS; ++i)
 			args[i] = NULL;
 
-		tokenize(line, " ", args); // To tokenize the input
+		tokenize(line, " ", args, &pipe_flag); // To tokenize the input
+
+		if (pipe_flag){
+			char* second_args[MAX_ARGS + 1] = {NULL};
+			
+			tokenize(strchr(line, '|'), " ", second_args, &pipe_flag);
+
+			execute_pipe(args, second_args);
+		}
 
 		int background = 0; // For background processes (indicator)
 		int arg_count = 0; // To define an additional arg_count to record how many arguments the user typed in the shell prompt
