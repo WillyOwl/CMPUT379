@@ -131,7 +131,7 @@ void run_external_program(char* command, char** args, int background){
 		else waitpid(pid, NULL, 0); // Foreground behavior, need to wait
 	}
 
-	else{
+	else {
 		perror("fork failed!");
 		exit(1);
 	}
@@ -145,15 +145,15 @@ void execute_pipe(char* args[], char* second_args[]){
 		exit(1);
 	}
 
-	pid_t pid = fork();
+	pid_t pid1 = fork();
 
-	if (pid < 0){
+	if (pid1 < 0){
 		perror("fork error");
 		exit(1);
 	}
 
-	if (pid == 0){
-		// Child process
+	else if (pid1 == 0){
+		// First child process
 		// First command (writes to the pipe)
 
 		dup2(fd[1], STDOUT_FILENO);
@@ -165,26 +165,41 @@ void execute_pipe(char* args[], char* second_args[]){
 		exit(1);
 	}
 
-	else if (pid > 0){
-		// Parent process
-		// Read from the child
+	else {
+		// Parent process - fork again for second command
 
-		dup2(fd[0], STDIN_FILENO);
-		close(fd[1]); // Close write end of the pipe in parent
-		close(fd[0]); // Close read end after duplicating
+		pid_t pid2 = fork();
 
-		execvp(second_args[0], second_args);
-		perror("execvp failed");
-		exit(1);
+		if (pid2 < 0){
+			perror("fork error");
+			exit(1);
+		}
 
-		waitpid(pid, NULL, 0);
+		else if (pid2 == 0){
+			// Second child process
+			// Second command (reads from the pipe)
+
+			dup2(fd[0], STDIN_FILENO);
+			close(fd[1]); // Close write end of the pipe in child
+			close(fd[0]); // Close read end after duplicating
+			
+			execvp(second_args[0], second_args);
+			perror("execvp failed");
+			exit(1);
+		}
+
+		else {
+			// Second parent process
+
+			close(fd[0]);
+			close(fd[1]);
+			waitpid(pid1, NULL, 0);
+			waitpid(pid2, NULL, 0);
+		}
 	}
 }
 
 int main(int argc, char **argv) {
-	// print the string prompt without a newline, before beginning to read
-	// tokenize the input, run the command(s), and print the result
-	// do this in a loop
 
 	char line[LINE_LENGTH];
 	char* args[MAX_ARGS + 1] = {NULL};
@@ -225,6 +240,8 @@ int main(int argc, char **argv) {
 			tokenize(strchr(line, '|'), " ", second_args, &pipe_flag);
 
 			execute_pipe(args, second_args);
+			pipe_flag = 0;
+			continue; 
 		}
 
 		int background = 0; // For background processes (indicator)
