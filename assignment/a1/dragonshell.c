@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 700
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -15,6 +16,7 @@
 // Define constants suggested by the requirement file
 
 pid_t background_pid = 0;
+pid_t foreground_pid = 0;
 
 /**
  * @brief Tokenize a C string 
@@ -128,7 +130,11 @@ void run_external_program(char* command, char** args, int background){
 			printf("PID %d is sent to background\n", background_pid);
 		}
 
-		else waitpid(pid, NULL, 0); // Foreground behavior, need to wait
+		else{
+			foreground_pid = pid; // Foreground behavior, need to wait
+			waitpid(pid, NULL, 0);
+			foreground_pid = 0;
+		} 
 	}
 
 	else {
@@ -193,13 +199,61 @@ void execute_pipe(char* args[], char* second_args[]){
 
 			close(fd[0]);
 			close(fd[1]);
+
+			foreground_pid = pid2;
+
 			waitpid(pid1, NULL, 0);
 			waitpid(pid2, NULL, 0);
+
+			foreground_pid = 0;
 		}
 	}
 }
 
+void sigint_handler(int signal){
+	(void)signal;
+	if (foreground_pid > 0){
+		kill(foreground_pid, SIGINT);
+		printf("\n");
+	}
+
+	else {
+		printf("\n");
+		fflush(stdout);
+	}
+}
+
+void sigtstp_handler(int signal){
+	(void)signal; 
+	if (foreground_pid > 0) {
+		kill(foreground_pid, SIGTSTP);
+		printf("\n");
+	}
+
+	else {
+		printf("\n");
+		fflush(stdout);
+	}
+}
+
 int main(int argc, char **argv) {
+	(void)argc; 
+	(void)argv;
+
+	struct sigaction sa_int, sa_tstp;
+
+	sa_int.sa_handler = sigint_handler;
+	sigemptyset(&sa_int.sa_mask);
+	sa_int.sa_flags = 0;
+
+	sa_tstp.sa_handler = sigtstp_handler;
+	sigemptyset(&sa_tstp.sa_mask);
+	sa_tstp.sa_flags = 0;
+
+	sigaction(SIGINT, &sa_int, NULL);
+	sigaction(SIGTSTP, &sa_tstp, NULL);
+
+
 
 	char line[LINE_LENGTH];
 	char* args[MAX_ARGS + 1] = {NULL};
@@ -224,7 +278,14 @@ int main(int argc, char **argv) {
 		printf("dragonshell> ");
 		fflush(stdout); // Make sure prompt appears immediately
 
-		if (fgets(line, LINE_LENGTH, stdin) == NULL) break;
+		if (fgets(line, LINE_LENGTH, stdin) == NULL) {
+			
+			if (feof(stdin)) break; 
+			
+			clearerr(stdin);
+			continue;
+		}
+
 		line[strcspn(line, "\n")] = '\0'; // Remove the newline character
 
 		if (strlen(line) == 0) continue; // Empty line
