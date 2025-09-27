@@ -18,6 +18,16 @@
 pid_t background_pid = 0;
 pid_t foreground_pid = 0;
 
+struct job {
+	pid_t pid;
+	char state;
+	char cmd[LINE_LENGTH];
+
+	struct job* next;
+};
+
+struct job* job_list = NULL;
+
 /**
  * @brief Tokenize a C string 
  * 
@@ -41,6 +51,53 @@ void tokenize(char* str, const char* delim, char ** argv, int* pipe_flag) {
   	}
 }
 
+void add_job(pid_t pid, char state, const char* cmd){
+	struct job* new_job = malloc(sizeof(struct job));
+
+	if (!new_job) return;
+
+	new_job->pid = pid;
+	new_job->state = state;
+	strncpy(new_job->cmd, cmd, LINE_LENGTH - 1);
+
+	new_job->cmd[LINE_LENGTH - 1] = '\0';
+	new_job->next = job_list;
+
+	job_list = new_job;
+
+}
+
+void remove_job(pid_t pid){
+	struct job* tmp;
+	struct job** curr_job = &job_list;
+
+	while (*curr_job){
+		if ((*curr_job)->pid == pid) {
+			tmp = *curr_job;
+			*curr_job = (*curr_job)->next;
+			free(tmp);
+
+			return;
+		}
+
+		*curr_job = (*curr_job)->next;
+	}
+}
+
+void update_job(pid_t pid, char state){
+	struct job* curr_job = job_list;
+
+	while (curr_job) {
+		if (curr_job->pid == pid){
+			curr_job->state = state;
+
+			return;
+		}
+
+		curr_job = curr_job->next;
+	}
+}
+
 // Built-in Commands Implementation
 
 void pwd_command(){
@@ -54,6 +111,16 @@ void pwd_command(){
 void cd_command(char* path){
 	if (path == NULL || chdir(path) != 0)
 		fprintf(stderr, "dragonshell: Expected argument to \"cd\"\n");
+}
+
+void jobs_command(){
+	struct job* curr_job = job_list;
+
+	while (curr_job) {
+		printf("%d %c %s\n", curr_job->pid, curr_job->state, curr_job->cmd);
+
+		curr_job = curr_job->next;
+	}
 }
 
 // Run external programs
@@ -128,11 +195,20 @@ void run_external_program(char* command, char** args, int background){
 			background_pid = pid;
 
 			printf("PID %d is sent to background\n", background_pid);
+
+			add_job(pid, 'R', command);
 		}
 
 		else{
 			foreground_pid = pid; // Foreground behavior, need to wait
-			waitpid(pid, NULL, 0);
+			add_job(pid, 'R', command);
+			int status;
+			waitpid(pid, &status, WUNTRACED);
+			
+			if (WIFSTOPPED(status)) update_job(pid, 'T');
+			
+			else remove_job(pid);
+			
 			foreground_pid = 0;
 		} 
 	}
@@ -227,7 +303,11 @@ void sigtstp_handler(int signal){
 	(void)signal; 
 	if (foreground_pid > 0) {
 		kill(foreground_pid, SIGTSTP);
+		update_job(foreground_pid, 'T');
+		foreground_pid = 0;  // No longer in foreground
+
 		printf("\n");
+		fflush(stdout);
 	}
 
 	else {
@@ -236,11 +316,26 @@ void sigtstp_handler(int signal){
 	}
 }
 
+void sigchld_handler(int signal){
+	(void)signal;
+
+	int status;
+	pid_t pid;
+
+	while ((pid = waitpid(-1, &status, WNOHANG | WUNTRACED | WCONTINUED)) > 0) {
+		if (WIFEXITED(status) || WIFSIGNALED(status)) remove_job(pid);
+
+		if (WIFSTOPPED(status)) update_job(pid, 'T');
+		
+		if (WIFCONTINUED(status)) update_job(pid, 'R');
+	}
+}
+
 int main(int argc, char **argv) {
 	(void)argc; 
 	(void)argv;
 
-	struct sigaction sa_int, sa_tstp;
+	struct sigaction sa_int, sa_tstp, sa_chld;
 
 	sa_int.sa_handler = sigint_handler;
 	sigemptyset(&sa_int.sa_mask);
@@ -250,9 +345,13 @@ int main(int argc, char **argv) {
 	sigemptyset(&sa_tstp.sa_mask);
 	sa_tstp.sa_flags = 0;
 
+	sa_chld.sa_handler = sigchld_handler;
+	sigemptyset(&sa_chld.sa_mask);
+	sa_chld.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+
 	sigaction(SIGINT, &sa_int, NULL);
 	sigaction(SIGTSTP, &sa_tstp, NULL);
-
+	sigaction(SIGCHLD, &sa_chld, NULL);
 
 
 	char line[LINE_LENGTH];
@@ -308,12 +407,6 @@ int main(int argc, char **argv) {
 		int background = 0; // For background processes (indicator)
 		int arg_count = 0; // To define an additional arg_count to record how many arguments the user typed in the shell prompt
 
-		/*
-		The argc parameter in main() tells you how many command-line arguments were passed to your program
-
-		If you run ./dragonshell argc = 1; ./dragonshell -v argc = 2
-		*/
-
 		while (args[arg_count] != NULL)
 			arg_count++;
 
@@ -336,6 +429,7 @@ int main(int argc, char **argv) {
 
 		if (strcmp(command, "pwd") == 0) pwd_command();
 		else if (strcmp(command, "cd") == 0) cd_command(args[1]);
+		else if (strcmp(command, "jobs") == 0) jobs_command();
 
 		else run_external_program(command, args, background);
 	}
