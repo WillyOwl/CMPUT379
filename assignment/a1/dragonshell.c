@@ -109,8 +109,10 @@ void pwd_command(){
 }
 
 void cd_command(char* path){
-	if (path == NULL || chdir(path) != 0)
+	if (path == NULL)
 		fprintf(stderr, "dragonshell: Expected argument to \"cd\"\n");
+	
+	else if (chdir(path) != 0) perror("dragonshell");
 }
 
 void jobs_command(){
@@ -162,7 +164,7 @@ void run_external_program(char* command, char** args, int background){
 			int output_fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 
 			if (output_fd == -1){
-				perror("Error opening output file.");
+				perror("Error opening output file");
 				exit(1);
 			}
 
@@ -174,7 +176,7 @@ void run_external_program(char* command, char** args, int background){
 			int input_fd = open(input_file, O_RDONLY);
 
 			if (input_fd == -1){
-				perror("Error opening input file.");
+				perror("Error opening input file");
 				exit(1);
 			}
 
@@ -184,7 +186,7 @@ void run_external_program(char* command, char** args, int background){
 
 
 		execvp(command, args);
-		perror("dragonshell: Command not found.\n");
+		fprintf(stderr, "dragonshell: Command not found\n");
 		exit(1);
 	}
 
