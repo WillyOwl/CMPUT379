@@ -51,6 +51,17 @@ void tokenize(char* str, const char* delim, char ** argv, int* pipe_flag) {
   	}
 }
 
+char* specify_command_path(const char* command, char* specified, size_t size) {
+	if (command[0] == '/' || command[0] == '.') {
+		strncpy(specified, command, size - 1);
+		specified[size - 1] = '\0';
+	}
+
+	else snprintf(specified, size, "./%s", command);
+
+	return specified;
+}
+
 void add_job(pid_t pid, char state, const char* cmd){
 	struct job* new_job = malloc(sizeof(struct job));
 
@@ -184,8 +195,14 @@ void run_external_program(char* command, char** args, int background){
 			close(input_fd);
 		}
 
+		char full_path[LINE_LENGTH];
 
-		execvp(command, args);
+		if (specify_command_path(command, full_path, sizeof(full_path)) == NULL) {
+			perror("specify_command_path failed");
+			exit(1);
+		}
+
+		execve(full_path, args, NULL);
 		fprintf(stderr, "dragonshell: Command not found\n");
 		exit(1);
 	}
@@ -244,8 +261,14 @@ void execute_pipe(char* args[], char* second_args[]){
 		close(fd[0]); // CLose read end of the pipe in child
 		close(fd[1]); // Close write end after duplicating
 		
-		execvp(args[0], args);
-		perror("execvp failed");
+		char full_path[LINE_LENGTH];
+        if (specify_command_path(args[0], full_path, sizeof(full_path)) == NULL) {
+            perror("specify_command_path failed");
+            exit(1);
+        }
+
+        execve(full_path, args, NULL);
+        perror("execve failed");
 		exit(1);
 	}
 
@@ -267,8 +290,14 @@ void execute_pipe(char* args[], char* second_args[]){
 			close(fd[1]); // Close write end of the pipe in child
 			close(fd[0]); // Close read end after duplicating
 			
-			execvp(second_args[0], second_args);
-			perror("execvp failed");
+			char full_path[LINE_LENGTH];
+        	if (specify_command_path(args[0], full_path, sizeof(full_path)) == NULL) {
+            	perror("specify_command_path failed");
+            	exit(1);
+        	}
+		
+        	execve(full_path, second_args, NULL);
+			perror("execve failed");
 			exit(1);
 		}
 
