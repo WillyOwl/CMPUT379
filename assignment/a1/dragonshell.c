@@ -62,6 +62,18 @@ char* specify_command_path(const char* command, char* specified, size_t size) {
 	return specified;
 }
 
+void build_full_command(char** args, char* full_cmd, size_t size) {
+	full_cmd[0] = '\0'; // Initialize empty string
+	int i = 0;
+	while (args[i] != NULL) {
+		if (i > 0) {
+			strncat(full_cmd, " ", size - strlen(full_cmd) - 1);
+		}
+		strncat(full_cmd, args[i], size - strlen(full_cmd) - 1);
+		i++;
+	}
+}
+
 void add_job(pid_t pid, char state, const char* cmd){
 	struct job* new_job = malloc(sizeof(struct job));
 
@@ -141,6 +153,10 @@ void jobs_command(){
 void run_external_program(char* command, char** args, int background){
 	int input_redirect = 0, output_redirect = 0;
 	char* input_file = NULL, *output_file = NULL;
+	
+	// Build complete command string with arguments
+	char full_command[LINE_LENGTH];
+	build_full_command(args, full_command, LINE_LENGTH);
 
 	// Check for output redirection
 
@@ -215,12 +231,14 @@ void run_external_program(char* command, char** args, int background){
 
 			printf("PID %d is sent to background\n", background_pid);
 
-			add_job(pid, 'R', command);
+			
+
+			add_job(pid, 'R', full_command);
 		}
 
 		else{
 			foreground_pid = pid; // Foreground behavior, need to wait
-			add_job(pid, 'R', command);
+			add_job(pid, 'R', full_command);
 			int status;
 			waitpid(pid, &status, WUNTRACED);
 			
