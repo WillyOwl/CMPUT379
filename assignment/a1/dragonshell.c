@@ -412,6 +412,41 @@ void sigchld_handler(int signal){
 	}
 }
 
+void cleanup_and_exit(){
+	struct job* curr_job = job_list;
+	
+	printf("Terminating all running processes...\n");
+	
+	// Send SIGTERM to all jobs
+	while (curr_job) {
+		printf("Sending SIGTERM to process %d\n", curr_job->pid);
+		kill(curr_job->pid, SIGTERM);
+		curr_job = curr_job->next;
+	}
+	
+	sleep(1);
+	
+	// Send SIGKILL to any remaining processes
+	curr_job = job_list;
+	while (curr_job) {
+		// Check if process still exists
+		if (kill(curr_job->pid, 0) == 0) {
+			printf("Force killing process %d\n", curr_job->pid);
+			kill(curr_job->pid, SIGKILL);
+		}
+		curr_job = curr_job->next;
+	}
+	
+	// Clean up job list
+	while (job_list) {
+		struct job* temp = job_list;
+		job_list = job_list->next;
+		free(temp);
+	}
+	
+	printf("Dragon Shell exiting...\n");
+}
+
 int main(int argc, char **argv) {
 	(void)argc; 
 	(void)argv;
@@ -502,7 +537,10 @@ int main(int argc, char **argv) {
 			args[arg_count - 1] = NULL;
 		}
 
-		if (strcmp(args[0], "exit") == 0) break; // Check for exit command
+		if (strcmp(args[0], "exit") == 0) {
+			cleanup_and_exit();
+			break;
+		}
 
 		/* Why strcmp() instead of ==
 		
