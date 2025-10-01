@@ -451,23 +451,24 @@ int main(int argc, char **argv) {
 	(void)argc; 
 	(void)argv;
 
-	struct sigaction sa_int, sa_tstp, sa_chld;
-
+	struct sigaction sa_int;
+	memset(&sa_int, 0, sizeof(sa_int));  // replaces sigemptyset()
 	sa_int.sa_handler = sigint_handler;
-	sigemptyset(&sa_int.sa_mask);
 	sa_int.sa_flags = 0;
-
-	sa_tstp.sa_handler = sigtstp_handler;
-	sigemptyset(&sa_tstp.sa_mask);
-	sa_tstp.sa_flags = 0;
-
-	sa_chld.sa_handler = sigchld_handler;
-	sigemptyset(&sa_chld.sa_mask);
-	sa_chld.sa_flags = SA_RESTART | SA_NOCLDSTOP;
-
 	sigaction(SIGINT, &sa_int, NULL);
+
+	struct sigaction sa_tstp;
+	memset(&sa_tstp, 0, sizeof(sa_tstp));
+	sa_tstp.sa_handler = sigtstp_handler;
+	sa_tstp.sa_flags = 0;
 	sigaction(SIGTSTP, &sa_tstp, NULL);
+
+	struct sigaction sa_chld;
+	memset(&sa_chld, 0, sizeof(sa_chld));
+	sa_chld.sa_handler = sigchld_handler;
+	sa_chld.sa_flags = SA_RESTART | SA_NOCLDSTOP;
 	sigaction(SIGCHLD, &sa_chld, NULL);
+
 
 
 	char line[LINE_LENGTH];
