@@ -29,6 +29,26 @@ struct job {
 struct job* job_list = NULL;
 
 /**
+ * @brief Remove quotes from a string if it's enclosed in quotes
+ * 
+ * @param str - The string to process
+ * @return The string with quotes removed (modifies in place)
+ */
+char* remove_quotes(char* str) {
+	if (str == NULL) return str;
+	
+	int len = strlen(str);
+	if (len >= 2 && 
+		((str[0] == '"' && str[len-1] == '"') || 
+		 (str[0] == '\'' && str[len-1] == '\''))) {
+		// Remove quotes by shifting the string
+		memmove(str, str + 1, len - 2);
+		str[len - 2] = '\0';
+	}
+	return str;
+}
+
+/**
  * @brief Tokenize a C string 
  * 
  * @param str - The C string to tokenize 
@@ -49,6 +69,19 @@ void tokenize(char* str, const char* delim, char ** argv, int* pipe_flag) {
     	argv[i] = token;
   		token = strtok(NULL, delim);
   	}
+}
+
+/**
+ * @brief Process arguments to remove quotes from quoted strings
+ * 
+ * @param argv - Array of argument strings to process
+ */
+void process_quotes_in_args(char** argv) {
+	if (argv == NULL) return;
+	
+	for (int i = 0; argv[i] != NULL; i++) {
+		remove_quotes(argv[i]);
+	}
 }
 
 char* specify_command_path(const char* command, char* specified, size_t size) {
@@ -154,7 +187,6 @@ void run_external_program(char* command, char** args, int background){
 	int input_redirect = 0, output_redirect = 0;
 	char* input_file = NULL, *output_file = NULL;
 	
-	// Build complete command string with arguments
 	char full_command[LINE_LENGTH];
 	build_full_command(args, full_command, LINE_LENGTH);
 
@@ -442,11 +474,17 @@ int main(int argc, char **argv) {
 			args[i] = NULL;
 
 		tokenize(line, " ", args, &pipe_flag); // To tokenize the input
+		
+		// Process quotes in arguments
+		process_quotes_in_args(args);
 
 		if (pipe_flag){
 			char* second_args[MAX_ARGS + 1] = {NULL};
 			
 			tokenize(strchr(line, '|'), " ", second_args, &pipe_flag);
+			
+			// Process quotes in second args for pipe
+			process_quotes_in_args(second_args);
 
 			execute_pipe(args, second_args);
 			pipe_flag = 0;
