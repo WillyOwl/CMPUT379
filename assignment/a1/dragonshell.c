@@ -341,7 +341,7 @@ void execute_pipe(char* args[], char* second_args[]){
 			close(fd[0]); // Close read end after duplicating
 			
 			char full_path[LINE_LENGTH];
-        	if (specify_command_path(args[0], full_path, sizeof(full_path)) == NULL) {
+        	if (specify_command_path(second_args[0], full_path, sizeof(full_path)) == NULL) {
             	perror("specify_command_path failed");
             	exit(1);
         	}
@@ -536,6 +536,9 @@ int main(int argc, char **argv) {
 			background = 1;
 			args[arg_count - 1] = NULL;
 		}
+
+		// Check if we have a valid command
+		if (args[0] == NULL) continue;
 
 		if (strcmp(args[0], "exit") == 0) {
 			cleanup_and_exit();
