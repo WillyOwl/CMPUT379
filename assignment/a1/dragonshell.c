@@ -175,7 +175,7 @@ void run_external_program(char* command, char** args, int background){
 			int output_fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 
 			if (output_fd == -1){
-				perror("Error opening output file");
+				fprintf(stderr, "dragonshell: Command not found\n");
 				exit(1);
 			}
 
@@ -187,7 +187,7 @@ void run_external_program(char* command, char** args, int background){
 			int input_fd = open(input_file, O_RDONLY);
 
 			if (input_fd == -1){
-				perror("Error opening input file");
+				fprintf(stderr, "dragonshell: Command not found\n");
 				exit(1);
 			}
 
