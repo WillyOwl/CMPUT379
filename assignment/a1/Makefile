@@ -5,19 +5,29 @@ CFLAGS = -Wall -Wextra -std=c99 -g
 # Target executable name
 TARGET = dragonshell
 
-# Source file (adjust if your file has a different name)
+# Source files
 SOURCES = dragonshell.c
 
-# Default target - this runs when you just type 'make'
+# Object files (generated from source files)
+OBJECTS = $(SOURCES:.c=.o)
+
+# Default target
 all: $(TARGET)
 
-# Rule to build the executable
-$(TARGET): $(SOURCES)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES)
+# Main target dragonshell - links all object files to produce executable
+dragonshell: $(OBJECTS)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJECTS)
 
-# Clean up compiled files
+# Target compile - compiles code and produces object file(s)
+compile: $(OBJECTS)
+
+# Rule to compile .c files to .o files
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Target clean - removes object file(s) and executable file(s)
 clean:
-	rm -f $(TARGET)
+	rm -f $(OBJECTS) $(TARGET)
 
 # Phony targets (targets that don't create files)
-.PHONY: all clean
+.PHONY: all dragonshell compile clean
