@@ -61,7 +61,7 @@ int setup_server_socket(const char* port) {
         
         if (fd == -1) continue;
 
-        int yes = -1;
+        int yes = 1;
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
 
         if (bind(fd, rp->ai_addr, rp->ai_addrlen) == 0) break; // success
