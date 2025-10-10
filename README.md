@@ -15,7 +15,7 @@ This repository consolidates course material, assignments, and reference impleme
 
 ## Highlight: Dragon Shell Assignment
 
-Dragon Shell is a custom UNIX shell written in C that supports built-in commands, external program execution, job control, signal handling, and standard shell conveniences such as I/O redirection, pipes, and quoting.【F:assignment/a1/README.md†L7-L71】 The assignment includes detailed testing notes and references for further reading.【F:assignment/a1/README.md†L73-L188】 Use the provided `Makefile` in `assignment/a1` to build the shell locally:
+Dragon Shell is a custom UNIX shell written in C that supports built-in commands, external program execution, job control, signal handling, and standard shell conveniences such as I/O redirection, pipes, and quoting. The assignment includes detailed testing notes and references for further reading. Use the provided `Makefile` in `assignment/a1` to build the shell locally:
 
 ```bash
 cd assignment/a1
