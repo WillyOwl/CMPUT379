@@ -190,29 +190,41 @@ void run_external_program(char* command, char** args, int background){
 	char full_command[LINE_LENGTH];
 	build_full_command(args, full_command, LINE_LENGTH);
 
-	// Check for output redirection
+	// Check for output/input redirection
 
-	for (int i = 0; args[i] != NULL; ++i)
-		if (strcmp(args[i], ">") == 0 && args[i + 1] != NULL){
+	for (int i = 0; args[i] != NULL; ){
+		if (strcmp(args[i], ">") == 0){
+			if (args[i + 1] == NULL) {
+				fprintf(stderr, "dragonshell: Missing output file\n");
+				return;
+			}
+
 			output_redirect = 1;
 			output_file = args[i + 1];
-			args[i] = NULL; 
-			/* Since '>' is just an identifier, but not a part of the file. 
-			We need to set it to NULL after the system specifies it and finishes redirection*/
 
-			break;
+			for (int j = i; args[j] != NULL; ++j)
+				args[j] = args[j + 2];
+
+			continue;
 		}
 
-	// Check for input redirection
+		if (strcmp(args[i], "<") == 0) {
+			if (args[i + 1] == NULL) {
+				fprintf(stderr, "dragonshell: Missing input file\n");
+				return;
+			}
 
-	for (int i = 0; args[i] != NULL; ++i)
-		if (strcmp(args[i], "<") == 0 && args[i + 1] != NULL){
 			input_redirect = 1;
 			input_file = args[i + 1];
-			args[i] = NULL; // Same logic as above one
 
-			break;
+			for (int j = i; args[j] != NULL; ++j)
+				args[j] = args[j + 2];
+
+			continue;
 		}
+
+		++i;
+	}
 
 	pid_t pid = fork();
 
@@ -287,6 +299,7 @@ void run_external_program(char* command, char** args, int background){
 		_exit(1);
 	}
 }
+
 
 void execute_pipe(char* args[], char* second_args[]){
 	int fd[2];
