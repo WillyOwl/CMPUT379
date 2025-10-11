@@ -224,7 +224,7 @@ void run_external_program(char* command, char** args, int background){
 
 			if (output_fd == -1){
 				fprintf(stderr, "dragonshell: Command not found\n");
-				exit(1);
+				_exit(1);
 			}
 
 			dup2(output_fd, STDOUT_FILENO);
@@ -236,7 +236,7 @@ void run_external_program(char* command, char** args, int background){
 
 			if (input_fd == -1){
 				fprintf(stderr, "dragonshell: Command not found\n");
-				exit(1);
+				_exit(1);
 			}
 
 			dup2(input_fd, STDIN_FILENO);
@@ -247,12 +247,12 @@ void run_external_program(char* command, char** args, int background){
 
 		if (specify_command_path(command, full_path, sizeof(full_path)) == NULL) {
 			perror("specify_command_path failed");
-			exit(1);
+			_exit(1);
 		}
 
 		execve(full_path, args, NULL);
 		fprintf(stderr, "dragonshell: Command not found\n");
-		exit(1);
+		_exit(1);
 	}
 
 	else if (pid > 0){
@@ -284,7 +284,7 @@ void run_external_program(char* command, char** args, int background){
 
 	else {
 		perror("fork failed!");
-		exit(1);
+		_exit(1);
 	}
 }
 
@@ -293,14 +293,14 @@ void execute_pipe(char* args[], char* second_args[]){
 
 	if (pipe(fd) < 0){
 		perror("pipe failed");
-		exit(1);
+		_exit(1);
 	}
 
 	pid_t pid1 = fork();
 
 	if (pid1 < 0){
 		perror("fork error");
-		exit(1);
+		_exit(1);
 	}
 
 	else if (pid1 == 0){
@@ -314,12 +314,12 @@ void execute_pipe(char* args[], char* second_args[]){
 		char full_path[LINE_LENGTH];
         if (specify_command_path(args[0], full_path, sizeof(full_path)) == NULL) {
             perror("specify_command_path failed");
-            exit(1);
+            _exit(1);
         }
 
         execve(full_path, args, NULL);
         perror("execve failed");
-		exit(1);
+		_exit(1);
 	}
 
 	else {
@@ -329,7 +329,7 @@ void execute_pipe(char* args[], char* second_args[]){
 
 		if (pid2 < 0){
 			perror("fork error");
-			exit(1);
+			_exit(1);
 		}
 
 		else if (pid2 == 0){
@@ -343,12 +343,12 @@ void execute_pipe(char* args[], char* second_args[]){
 			char full_path[LINE_LENGTH];
         	if (specify_command_path(second_args[0], full_path, sizeof(full_path)) == NULL) {
             	perror("specify_command_path failed");
-            	exit(1);
+            	_exit(1);
         	}
 		
         	execve(full_path, second_args, NULL);
 			perror("execve failed");
-			exit(1);
+			_exit(1);
 		}
 
 		else {
